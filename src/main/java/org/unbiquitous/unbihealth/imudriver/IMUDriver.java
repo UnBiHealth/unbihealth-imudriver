@@ -5,11 +5,10 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.sound.midi.SysexMessage;
-
 import jssc.SerialPort;
 import jssc.SerialPortException;
 
+import org.unbiquitous.unbihealth.core.data.Vector3;
 import org.unbiquitous.uos.core.InitialProperties;
 import org.unbiquitous.uos.core.UOSLogging;
 import org.unbiquitous.uos.core.adaptabitilyEngine.Gateway;
@@ -25,9 +24,9 @@ import org.unbiquitous.uos.core.messageEngine.messages.Response;
 import org.unbiquitous.uos.core.network.model.NetworkDevice;
 
 public class IMUDriver implements UosEventDriver {
-	public static final String DRIVER_NAME = "org.unbiquitous.unbihealth.IMUDriver";
+	public static final String DRIVER_NAME = "org.unbiquitous.ubihealth.IMODriver";
 	public static final String MOVE_EVENT_KEY = "move";
-	public static final String SERIAL_PORT_PROP_KEY = "unbihealth.imudriver.serialport";
+	public static final String SERIAL_PORT_PROP_KEY = "ubihealth.imodriver.serialport";
 
 	private static final UpDriver _driver = new UpDriver(DRIVER_NAME);
 	{
@@ -104,10 +103,21 @@ public class IMUDriver implements UosEventDriver {
 
 					while (running) {
 						port.writeBytes(">1,1\n".getBytes());
-						Thread.sleep(3);
-						String s = port.readString();
-						System.out.print(s);
-						Vector3 data = extract(s);
+						Thread.sleep(0);
+						String s;
+						Vector3 data = null;
+						boolean isNull = true;
+						while (isNull) {
+							s = port.readString();
+
+							try {
+								data = extract(s);
+							} catch (Exception e) {
+								continue;
+							}
+							isNull = false;
+							System.out.println(s);
+						}
 						Vector3 ds = data.subtract(lastData);
 
 						if (ds.sqrMagnitude() > 0.1) {
@@ -127,6 +137,8 @@ public class IMUDriver implements UosEventDriver {
 						System.out.println("Time: " + (t - lastT));
 						lastT = t;
 					}
+				} else {
+					logger.log(Level.SEVERE, "Port did not open");
 				}
 			} catch (SerialPortException e) {
 				logger.log(Level.SEVERE, "serial port failure", e);
