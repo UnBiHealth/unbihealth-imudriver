@@ -1,5 +1,7 @@
 package org.unbiquitous.unbihealth.imudriver;
 
+import java.util.logging.Level;
+
 import org.unbiquitous.uos.core.InitialProperties;
 import org.unbiquitous.uos.core.UOS;
 import org.unbiquitous.uos.core.UOSLogging;
@@ -7,14 +9,14 @@ import org.unbiquitous.uos.core.adaptabitilyEngine.Gateway;
 import org.unbiquitous.uos.core.adaptabitilyEngine.ServiceCallException;
 import org.unbiquitous.uos.core.messageEngine.messages.Call;
 import org.unbiquitous.uos.core.messageEngine.messages.Response;
-
-import java.util.logging.Level;
+import org.unbiquitous.uos.network.socket.connectionManager.TCPConnectionManager;
 
 public class Starter {
 	public static void main(String[] args) {
 		UOSLogging.setLevel(Level.ALL);
 		UOS uos = new UOS();
 		InitialProperties initProps = new InitialProperties();
+		initProps.addConnectionManager(TCPConnectionManager.class);
 		initProps.addDriver(IMUDriver.class);
 		initProps.put(IMUDriver.SERIAL_PORT_PROP_KEY, "/dev/tty.usbmodemfa131");
 		uos.start(initProps);
