@@ -1,14 +1,15 @@
 package org.unbiquitous.unbihealth.imudriver;
 
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import jssc.SerialPort;
 import jssc.SerialPortException;
 
-import org.unbiquitous.unbihealth.core.data.Vector3;
+import org.unbiquitous.unbihealth.core.types.Vector3;
 import org.unbiquitous.uos.core.InitialProperties;
 import org.unbiquitous.uos.core.UOSLogging;
 import org.unbiquitous.uos.core.adaptabitilyEngine.Gateway;
@@ -28,14 +29,31 @@ public class IMUDriver implements UosEventDriver {
 	public static final String MOVE_EVENT_KEY = "move";
 	public static final String SERIAL_PORT_PROP_KEY = "ubihealth.imodriver.serialport";
 
+
 	private static final UpDriver _driver = new UpDriver(DRIVER_NAME);
 	{
 		_driver.addEvent(MOVE_EVENT_KEY);
 	}
 	private static Logger logger = UOSLogging.getLogger();
 
+	private class RequestData {
+		public UUID id;
+		public Call call;
+		public Response response;
+		public CallContext context;
+
+		public RequestData(UUID id, Call call, Response response, CallContext context) {
+			this.id = id;
+			this.call = call;
+			this.response = response;
+			this.context = context;
+		}
+	}
+
 	private Gateway gateway;
 	private InitialProperties initProps;
+	private Queue<RequestData> requestQueue = new ConcurrentLinkedDeque<>();
+	private Map<UUID, RequestData> responses = new ConcurrentHashMap<>();
 	private HashMap<UpNetworkInterface, UpDevice> listeners = new HashMap<UpNetworkInterface, UpDevice>();
 	private boolean running = false;
 	private SerialPort port;
@@ -76,6 +94,22 @@ public class IMUDriver implements UosEventDriver {
 		listeners.remove(getNetworkInterface(context));
 	}
 
+	public void calibrate(Call call, Response response, CallContext context) {
+		RequestData request = new RequestData(UUID.randomUUID(), call, response, context);
+		requestQueue.add(request);
+		while (!responses.containsKey(request.id))
+			Thread.yield();
+		responses.remove(request.id);
+	}
+
+	public void getEulerAngles(Call call, Response response, CallContext context) {
+		RequestData request = new RequestData(UUID.randomUUID(), call, response, context);
+		requestQueue.add(request);
+		while (!responses.containsKey(request.id))
+			Thread.yield();
+		responses.remove(request.id);
+	}
+
 	private static UpNetworkInterface getNetworkInterface(CallContext context) {
 		NetworkDevice networkDevice = context.getCallerNetworkDevice();
 		String host = networkDevice.getNetworkDeviceName().split(":")[1];
@@ -102,7 +136,42 @@ public class IMUDriver implements UosEventDriver {
 					running = true;
 
 					while (running) {
-						port.writeBytes(">1,1\n".getBytes());
+						if (!requestQueue.isEmpty()) {
+							RequestData nextRequest = requestQueue.poll();
+							if (nextRequest.call.getService().equals("getEulerAngles")) {
+								port.writeBytes(">1,1\n".getBytes());
+								Thread.sleep(0);
+								String s;
+								Vector3 data = null;
+								boolean isNull = true;
+								while (isNull) {
+									s = port.readString();
+
+									try {
+										data = extract(s);
+									} catch (Exception e) {
+										continue;
+									}
+									isNull = false;
+									System.out.println(s);
+								}
+								Vector3 ds = data.subtract(lastData);
+								nextRequest.response.addParameter("ANGLE_X",ds.x);
+								nextRequest.response.addParameter("ANGLE_X",ds.y);
+								nextRequest.response.addParameter("ANGLE_X",ds.z);
+								nextRequest.response.setError(null);
+
+							}
+							else if (nextRequest.call.getService().equals("calibrate")) {
+
+							}
+							else if (nextRequest.call.getService().equals("tare")) {
+
+							}
+						}
+
+
+						/*port.writeBytes(">1,1\n".getBytes());
 						Thread.sleep(0);
 						String s;
 						Vector3 data = null;
@@ -135,7 +204,7 @@ public class IMUDriver implements UosEventDriver {
 						}
 						long t = System.currentTimeMillis();
 						System.out.println("Time: " + (t - lastT));
-						lastT = t;
+						lastT = t;*/
 					}
 				} else {
 					logger.log(Level.SEVERE, "Port did not open");
