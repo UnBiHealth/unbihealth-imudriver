@@ -28,6 +28,8 @@ public class IMUDriver implements UosEventDriver {
 	public static final String DRIVER_NAME = "org.unbiquitous.ubihealth.IMODriver";
 	public static final String MOVE_EVENT_KEY = "move";
 	public static final String SERIAL_PORT_PROP_KEY = "ubihealth.imodriver.serialport";
+	public static final String ARM_IMU_ADDRESS = "0";
+	public static final String FOREARM_IMU_ADDRESS = "1";
 
 
 	private static final UpDriver _driver = new UpDriver(DRIVER_NAME);
@@ -110,6 +112,22 @@ public class IMUDriver implements UosEventDriver {
 		responses.remove(request.id);
 	}
 
+	public void startStreaming(Call call, Response response, CallContext context) {
+		RequestData request = new RequestData(UUID.randomUUID(), call, response, context);
+		requestQueue.add(request);
+		while (!responses.containsKey(request.id))
+			Thread.yield();
+		responses.remove(request.id);
+	}
+
+	public void tare(Call call, Response response, CallContext context) {
+		RequestData request = new RequestData(UUID.randomUUID(), call, response, context);
+		requestQueue.add(request);
+		while (!responses.containsKey(request.id))
+			Thread.yield();
+		responses.remove(request.id);
+	}
+
 	private static UpNetworkInterface getNetworkInterface(CallContext context) {
 		NetworkDevice networkDevice = context.getCallerNetworkDevice();
 		String host = networkDevice.getNetworkDeviceName().split(":")[1];
@@ -139,8 +157,7 @@ public class IMUDriver implements UosEventDriver {
 						if (!requestQueue.isEmpty()) {
 							RequestData nextRequest = requestQueue.poll();
 							if (nextRequest.call.getService().equals("getEulerAngles")) {
-								port.writeBytes(">1,1\n".getBytes());
-								Thread.sleep(0);
+								port.writeBytes(">".concat(ARM_IMU_ADDRESS).concat(",1\n").getBytes());
 								String s;
 								Vector3 data = null;
 								boolean isNull = true;
@@ -157,16 +174,65 @@ public class IMUDriver implements UosEventDriver {
 								}
 								Vector3 ds = data.subtract(lastData);
 								nextRequest.response.addParameter("ANGLE_X",ds.x);
-								nextRequest.response.addParameter("ANGLE_X",ds.y);
-								nextRequest.response.addParameter("ANGLE_X",ds.z);
+								nextRequest.response.addParameter("ANGLE_Y",ds.y);
+								nextRequest.response.addParameter("ANGLE_Z", ds.z);
 								nextRequest.response.setError(null);
-
+								//System.out.println(nextRequest.response);
+								responses.put(nextRequest.id, nextRequest);
 							}
 							else if (nextRequest.call.getService().equals("calibrate")) {
+								port.writeBytes(">".concat(ARM_IMU_ADDRESS).concat(",165\n").getBytes());
+								String s;
+								Vector3 data = null;
+								boolean isNull = true;
+								while (isNull) {
+									s = port.readString();
 
+									try {
+										data = extract(s);
+									} catch (Exception e) {
+										continue;
+									}
+									isNull = false;
+									System.out.println(s);
+								}
+								responses.put(nextRequest.id, nextRequest);
 							}
 							else if (nextRequest.call.getService().equals("tare")) {
+								port.writeBytes(">".concat(ARM_IMU_ADDRESS).concat(",96\n").getBytes());
+								String s;
+								Vector3 data = null;
+								boolean isNull = true;
+								while (isNull) {
+									s = port.readString();
 
+									try {
+										data = extract(s);
+									} catch (Exception e) {
+										continue;
+									}
+									isNull = false;
+									System.out.println(s);
+								}
+								responses.put(nextRequest.id, nextRequest);
+							}
+							else if (nextRequest.call.getService().equals("startStreaming")) {
+								port.writeBytes(">".concat(ARM_IMU_ADDRESS).concat(",85\n").getBytes());
+								String s;
+								Vector3 data = null;
+								boolean isNull = true;
+								while (isNull) {
+									s = port.readString();
+
+									try {
+										data = extract(s);
+									} catch (Exception e) {
+										continue;
+									}
+									//isNull = false;
+									System.out.println(s);
+								}
+								responses.put(nextRequest.id, nextRequest);
 							}
 						}
 
@@ -211,8 +277,6 @@ public class IMUDriver implements UosEventDriver {
 				}
 			} catch (SerialPortException e) {
 				logger.log(Level.SEVERE, "serial port failure", e);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
 			}
 		}
 
