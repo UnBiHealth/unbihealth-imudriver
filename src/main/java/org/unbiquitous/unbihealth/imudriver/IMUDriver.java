@@ -28,8 +28,8 @@ public class IMUDriver implements UosEventDriver {
 	public static final String DRIVER_NAME = "org.unbiquitous.ubihealth.IMODriver";
 	public static final String MOVE_EVENT_KEY = "move";
 	public static final String SERIAL_PORT_PROP_KEY = "ubihealth.imodriver.serialport";
-	public static final String ARM_IMU_ADDRESS = "0";
-	public static final String FOREARM_IMU_ADDRESS = "1";
+	public static final String ARM_IMU_ADDRESS = "2";
+	public static final String FOREARM_IMU_ADDRESS = "3";
 
 
 	private static final UpDriver _driver = new UpDriver(DRIVER_NAME);
@@ -157,7 +157,7 @@ public class IMUDriver implements UosEventDriver {
 						if (!requestQueue.isEmpty()) {
 							RequestData nextRequest = requestQueue.poll();
 							if (nextRequest.call.getService().equals("getEulerAngles")) {
-								port.writeBytes(">".concat(ARM_IMU_ADDRESS).concat(",1\n").getBytes());
+								port.writeBytes(">".concat(FOREARM_IMU_ADDRESS).concat(",1\n").getBytes());
 								String s;
 								Vector3 data = null;
 								boolean isNull = true;
@@ -181,7 +181,7 @@ public class IMUDriver implements UosEventDriver {
 								responses.put(nextRequest.id, nextRequest);
 							}
 							else if (nextRequest.call.getService().equals("calibrate")) {
-								port.writeBytes(">".concat(ARM_IMU_ADDRESS).concat(",165\n").getBytes());
+								port.writeBytes(">".concat(FOREARM_IMU_ADDRESS).concat(",165\n").getBytes());
 								String s;
 								Vector3 data = null;
 								boolean isNull = true;
@@ -199,7 +199,7 @@ public class IMUDriver implements UosEventDriver {
 								responses.put(nextRequest.id, nextRequest);
 							}
 							else if (nextRequest.call.getService().equals("tare")) {
-								port.writeBytes(">".concat(ARM_IMU_ADDRESS).concat(",96\n").getBytes());
+								port.writeBytes(">".concat(FOREARM_IMU_ADDRESS).concat(",96\n").getBytes());
 								String s;
 								Vector3 data = null;
 								boolean isNull = true;
@@ -214,13 +214,9 @@ public class IMUDriver implements UosEventDriver {
 									isNull = false;
 									System.out.println(s);
 								}
-								responses.put(nextRequest.id, nextRequest);
-							}
-							else if (nextRequest.call.getService().equals("startStreaming")) {
-								port.writeBytes(">".concat(ARM_IMU_ADDRESS).concat(",85\n").getBytes());
-								String s;
-								Vector3 data = null;
-								boolean isNull = true;
+								port.writeBytes(">".concat(ARM_IMU_ADDRESS).concat(",96\n").getBytes());
+								data = null;
+								isNull = true;
 								while (isNull) {
 									s = port.readString();
 
@@ -229,9 +225,86 @@ public class IMUDriver implements UosEventDriver {
 									} catch (Exception e) {
 										continue;
 									}
-									//isNull = false;
+									isNull = false;
 									System.out.println(s);
 								}
+								responses.put(nextRequest.id, nextRequest);
+							}
+							else if (nextRequest.call.getService().equals("startStreaming")) {
+								String s;
+								Vector3 dataf = null;
+								Vector3 dataa = null;
+								boolean isNull = true;
+
+								for (int i = 0; i < 1000; i++) {
+//									System.out.println("Forearm...");
+									port.writeBytes(">".concat(FOREARM_IMU_ADDRESS).concat(",1\n").getBytes());
+									isNull = true;
+									while (isNull) {
+										s = port.readString();
+
+										try {
+											dataf = extract(s);
+										} catch (Exception e) {
+											continue;
+										}
+										isNull = false;
+//										System.out.println(s);
+									}
+
+									isNull = true;
+//									System.out.println("Arm...");
+									port.writeBytes(">".concat(ARM_IMU_ADDRESS).concat(",1\n").getBytes());
+									while (isNull) {
+										s = port.readString();
+
+										try {
+											dataa = extract(s);
+										} catch (Exception e) {
+											continue;
+										}
+										isNull = false;
+//										System.out.println(s);
+									}
+
+									double angX = dataf.x - dataa.x;
+									System.out.println(angX);
+								}
+
+
+								/*System.out.println("Start streaming");
+								port.writeBytes(">".concat(FOREARM_IMU_ADDRESS).concat(",85\n").getBytes());
+								String s;
+								Vector3 data = null;
+								*//*for (int i = 0; i < 100; i++) {
+									System.out.println("Respostas...");
+									s = port.readString();
+
+									try {
+										data = extract(s);
+									} catch (Exception e) {
+										continue;
+									}
+									//isNull = false;
+									System.out.println(Integer.toString(i).concat(": ").concat(s));
+								}*//*
+								int i = 0;
+								while (i < 10) {
+									s = port.readString();
+
+									try {
+										data = extract(s);
+									} catch (Exception e) {
+										continue;
+									}
+									System.out.println("x: ".concat(Double.toString(data.x)));
+									System.out.println("y: ".concat(Double.toString(data.y)));
+									System.out.println("z: ".concat(Double.toString(data.z)));
+									System.out.println("");
+									i++;
+								}*/
+
+//								port.writeBytes(">".concat(FOREARM_IMU_ADDRESS).concat(",86\n").getBytes());
 								responses.put(nextRequest.id, nextRequest);
 							}
 						}
@@ -283,9 +356,11 @@ public class IMUDriver implements UosEventDriver {
 		private Vector3 extract(String response) {
 			String[] data = response.split(",");
 			Vector3 v = new Vector3();
-			v.x = Double.parseDouble(data[0]) / Math.PI;
-			v.y = Double.parseDouble(data[1]) / Math.PI;
-			v.z = Double.parseDouble(data[2]) / Math.PI;
+			if(data.length > 3) {
+				v.x = Double.parseDouble(data[3]) / Math.PI;
+				v.y = Double.parseDouble(data[4]) / Math.PI;
+				v.z = Double.parseDouble(data[5]) / Math.PI;
+			}
 			return v;
 		}
 	}
