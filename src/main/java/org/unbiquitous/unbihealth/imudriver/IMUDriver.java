@@ -1,14 +1,7 @@
 package org.unbiquitous.unbihealth.imudriver;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 import jssc.SerialPort;
 import jssc.SerialPortException;
-
 import org.unbiquitous.unbihealth.core.types.Vector3;
 import org.unbiquitous.uos.core.InitialProperties;
 import org.unbiquitous.uos.core.UOSLogging;
@@ -24,12 +17,19 @@ import org.unbiquitous.uos.core.messageEngine.messages.Notify;
 import org.unbiquitous.uos.core.messageEngine.messages.Response;
 import org.unbiquitous.uos.core.network.model.NetworkDevice;
 
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 public class IMUDriver implements UosEventDriver {
 	public static final String DRIVER_NAME = "org.unbiquitous.ubihealth.IMODriver";
 	public static final String MOVE_EVENT_KEY = "move";
 	public static final String SERIAL_PORT_PROP_KEY = "ubihealth.imodriver.serialport";
-	public static final String ARM_IMU_ADDRESS = "2";
-	public static final String FOREARM_IMU_ADDRESS = "3";
+	public static final String ARM_IMU_ADDRESS = "3";
+	public static final String FOREARM_IMU_ADDRESS = "2";
+	public static final String TRUNK_ADDRESS = "1";
 
 
 	private static final UpDriver _driver = new UpDriver(DRIVER_NAME);
@@ -234,6 +234,7 @@ public class IMUDriver implements UosEventDriver {
 								String s;
 								Vector3 dataf = null;
 								Vector3 dataa = null;
+								Vector3 datat = null;
 								boolean isNull = true;
 
 								for (int i = 0; i < 1000; i++) {
@@ -267,8 +268,32 @@ public class IMUDriver implements UosEventDriver {
 //										System.out.println(s);
 									}
 
-									double angX = dataf.x - dataa.x;
-									System.out.println(angX);
+									isNull = true;
+//									System.out.println("Arm...");
+									port.writeBytes(">".concat(TRUNK_ADDRESS).concat(",1\n").getBytes());
+									while (isNull) {
+										s = port.readString();
+
+										try {
+											datat = extract(s);
+										} catch (Exception e) {
+											continue;
+										}
+										isNull = false;
+//										System.out.println(s);
+									}
+
+									double angXt = dataa.x - datat.x;
+									double angYt = dataa.y - datat.y;
+									double angZt = dataa.z - datat.z;
+
+									double angXa = dataf.x - dataa.x;
+									double angYa = dataf.y - dataa.y;
+									double angZa = dataf.z - dataa.z;
+
+									System.out.println(Double.toString(angXt).concat(",").concat(Double.toString(angYt)).concat(",").concat(Double.toString(angZt)).concat(",").concat(Double.toString(angXa)).concat(",").concat(Double.toString(angYa)).concat(",").concat(Double.toString(angZa)).concat(";"));
+//									System.out.println(angY);
+//									System.out.println(angZ);
 								}
 
 
