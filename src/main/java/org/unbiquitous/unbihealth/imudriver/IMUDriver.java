@@ -25,7 +25,7 @@ import org.unbiquitous.uos.core.messageEngine.messages.Response;
 import org.unbiquitous.uos.core.network.model.NetworkDevice;
 
 public class IMUDriver implements UosEventDriver {
-	public static final String DRIVER_NAME = "org.unbiquitous.ubihealth.IMODriver";
+	public static final String DRIVER_NAME = "org.unbiquitous.ubihealth.IMUDriver";
 	public static final String MOVE_EVENT_KEY = "move";
 	public static final String SERIAL_PORT_PROP_KEY = "ubihealth.imodriver.serialport";
 	public static final String ARM_IMU_ADDRESS = "2";
